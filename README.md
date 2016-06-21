@@ -1,12 +1,12 @@
-= ZibPhotobooth
+# ZibPhotobooth
 A Raspberry Pi Photo Booth program. 
 
-== Features
+## Features
 * Uses Raspberry Pi Touchscreen
 * Konami Code exits (for when a keyboard isn't attached.) 
 * Change photo effect (Using PiCamera's Effects.) 
 
-== Not Completed
+## Not Completed
 * Combining Photos into a composite photo strip. 
 * Display photo strip. 
 * Adding custom text/logo/event name to photo strip. 
