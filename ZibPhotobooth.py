@@ -1,13 +1,25 @@
 #!/usr/bin/env python3
-import pygame
-from time import sleep
-import time
+
+### Andrew Zbikowski's <andrew@zibnet.us> Raspberry Pi PhotoBooth.
+### Version: 2016-06-20
+### Version: 2016-06-21: Moved text display from PiCamera annotations to PyGame. Much better.
+
 import picamera
+import pygame
+import time
 import os
 
+from time import sleep
+
+
+
 ########## Configuration Section.
+# Idle Time, in seconds
+IDLETIME = 30
+
 # Preview Alpha, 0-255
-PREVIEW_ALPHA = 200
+PREVIEW_ALPHA = 120
+#PREVIEW_ALPHA = 200
 
 # Set Screen Dimensions
 SCREEN_WIDTH = 800
@@ -19,14 +31,6 @@ NUMPHOTOS = 4
 # Camera Rotation
 CAMROTATION = 270
 CAMFREAMERATE = 15
-# Text Annotation Size
-ANNOTATIONSIZE = 48
-#54
-#66
-#ANNOTATIONSIZE = 72
-#80
-#88
-#ANNOTATIONSIZE = 96
 
 # Working Directory
 globalWorkDir = '/home/aszbikowski/PhotoBooth_WorkDir'
@@ -38,7 +42,7 @@ ZONEWIDTH = 100
 
 ########## End of Configuration Section.
 
-########## Settings/Globals. No modification necissary.
+########## Global variables. No modification necissary.
 # For readable code.
 LEFTMOUSEBUTTON = 1
 
@@ -88,10 +92,9 @@ DOWN_MIN_Y = SCREEN_HEIGHT - ZONEWIDTH
 DOWN_MAX_Y = SCREEN_HEIGHT
 
 # Konami Code tracker.
-KonamiLast = 'None'
+globalKonamiLast = 'None'
 
-# RGB Code for Blue
-BLUE = (0, 128, 255)
+# RGB Codes
 red = (255,0,0)
 green = (0,255,0)
 blue = (0,0,255)
@@ -100,15 +103,29 @@ white = (255,255,255)
 black = (0,0,0)
 pink = (255,200,200)
 
-running = 1
+### Initialise PyGame
+#pygame.mixer.pre_init(44100, -16, 1, 1024*3) #PreInit Music, plays faster
+pygame.init() #Initialise pygame
 # Don't full screen until you have a way to quit the program. ;)
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT),pygame.FULLSCREEN)
+pygame.display.set_caption('Photo Booth')
+
+# Setup the game surface
+background = pygame.Surface(screen.get_size())
+background = background.convert()
+background.fill(black)
+
 #screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 #pygame.mouse.set_visible(False)
+# Working around what seems to be a bug in PyGame and/or libsdl where the
+# cursor gets stuck in the lower right corner of the Raspberry Pi touchscreen
+# after a few taps. This only happens when the cursor is not visible in PyGame Fullscreen.
+# My workaround is setting a very small cursor. 
 pygame.mouse.set_visible(True)
 pygame.mouse.set_cursor((8, 8), (4, 4), (24, 24, 24, 231, 231, 24, 24, 24), (0, 0, 0, 0, 0, 0, 0, 0))
 
-#ImgOK = pygame.image.load('Start.png')
+# Load images and scale them to the screen and tap zones. 
+# At some point find a GO! or START! icon that works with the transparency and all that. 
 ImgOK = pygame.image.load('OK.png')
 ImgOK = pygame.transform.scale(ImgOK, (ZONEWIDTH, ZONEWIDTH))
 ImgPointLeft = pygame.image.load('PointLeft.png')
@@ -122,106 +139,183 @@ ImgA = pygame.image.load('A.png')
 ImgA = pygame.transform.scale(ImgA, (ZONEWIDTH, ZONEWIDTH))
 ImgB = pygame.image.load('B.png')
 ImgB = pygame.transform.scale(ImgB, (ZONEWIDTH, ZONEWIDTH))
+
+# Fonts to be used.
+smallfont = pygame.font.Font(None, 50) #S mall font for on screen messages.
+# Original: 180
+bigfont = pygame.font.Font(None, 220) # Big font for countdown.
+
 ########## End of Settings/Globals.
 
 ########## Object Initilizations.
 camera = picamera.PiCamera()
-#camera.rotation = 180
 camera.rotation = CAMROTATION
 camera.framerate = CAMFREAMERATE
-# Default text size is 32, range is 6-160.
-camera.annotate_text_size = ANNOTATIONSIZE
 
 # List of effects to cycle through.
 globalEffectList = ['none','sketch','posterise','emboss','negative','colorswap',
                     'hatch','watercolor','cartoon','washedout','solarize','oilpaint']
-# List of friendly names for the various effects.
+# Dictionary of friendly names for the various effects.
 globalEffectDict = {'none': 'Normal','sketch':'Artist Sketch','posterise':'Poster','emboss':'Embossed',
                     'negative':'Negative Zone','colorswap':'Swap Colors','hatch':'Crosshatch','watercolor':'Water Color',
                     'cartoon':'Cartoon','washedout':'Washed Out','solarize':'Solar Flare','oilpaint':'Oil Painting'}
-# Set the current effect.
 # Current effect.
 globalEffectCurr = 0
 # Number of effects.
 globalEffectLeng = len(globalEffectList)-1
 
 # Photobooth SessionID
+# When a session is in progress, touchscreen inputs are ignored. 
 SessionID = 0
 
+# Show instructions on screen?
+ShowInstructions = True
+LastTap = 0
 
-########## Functions
+ ########## Functions
 
-# Draws the Previous, Next, and Start tap zones on screen.
-def ShowTapZones(KonamiScreen):
-    # Draw the Previous tap zone on screen.
-    pygame.draw.rect(screen, BLUE, pygame.Rect(PREV_X, PREV_Y, ZONEWIDTH, SCREEN_HEIGHT))
-    # Draw the Next tap zone on screen.
-    pygame.draw.rect(screen, BLUE, pygame.Rect(NEXT_X, 0, ZONEWIDTH, SCREEN_HEIGHT))
-    # Draw the Start tap zone on screen.
-    pygame.draw.rect(screen, BLUE, pygame.Rect(START_MIN_X, START_MIN_Y, ZONEWIDTH, ZONEWIDTH))
-    #pygame.draw.circle(screen, (0, 128, 255), (400, 240), 75)
-
-    if KonamiScreen == True:
-        screen.blit(ImgB, (PREV_X, START_MIN_Y))
-        screen.blit(ImgA, (NEXT_X, START_MIN_Y))
-        screen.blit(ImgStart, (START_MIN_X, START_MIN_Y))
-    else:
-        screen.blit(ImgPointLeft, (PREV_X, START_MIN_Y))
-        screen.blit(ImgPointRight, (NEXT_X, START_MIN_Y))
-        screen.blit(ImgOK, (START_MIN_X, START_MIN_Y))
+# Replacing ShowTapZones() with a more generic UpdateDisplay(). 
+# When I'm done, ShowTapZones() will do exactly what it says. 
+# Update display will take care of deciding which elements should be on screen.
+def UpdateDisplay():
+    global screen
+    global background
+    # Blit everything to the screen
+    screen.blit(background, (0, 0))
     pygame.display.flip()
     return
+# End of function
+ 
+# Draws the Previous, Next, and Start tap zones on screen.
+def ShowTapZones(KonamiScreen):
+    global screen
+    global background
+    background.fill(pygame.Color("black"))  # Black background
+    # Draw the Previous tap zone on screen.
+    pygame.draw.rect(background, blue, pygame.Rect(PREV_X, PREV_Y, ZONEWIDTH, SCREEN_HEIGHT))
+    # Draw the Next tap zone on screen.
+    pygame.draw.rect(background, blue, pygame.Rect(NEXT_X, 0, ZONEWIDTH, SCREEN_HEIGHT))
+    # Draw the Start tap zone on screen.
+    pygame.draw.rect(background, blue, pygame.Rect(START_MIN_X, START_MIN_Y, ZONEWIDTH, ZONEWIDTH))
+    #pygame.draw.circle(screen, (0, 128, 255), (400, 240), 75)
+
+    # If Up,Up,Down,Down,Left,Right,Left,Right has been successfully entered,
+    # the tap zone icons change to B, A, and an alien guy.
+    if KonamiScreen == True:
+        background.blit(ImgB, (PREV_X, START_MIN_Y))
+        background.blit(ImgA, (NEXT_X, START_MIN_Y))
+        background.blit(ImgStart, (START_MIN_X, START_MIN_Y))
+    else:
+        background.blit(ImgPointLeft, (PREV_X, START_MIN_Y))
+        background.blit(ImgPointRight, (NEXT_X, START_MIN_Y))
+        background.blit(ImgOK, (START_MIN_X, START_MIN_Y))
+
+    if ShowInstructions == True:
+        SetInstructions()
+    SetEffectText(globalEffectList[globalEffectCurr])
+    UpdateDisplay()
+    return
+# End of function
+
+def SetBlankScreen():
+    background.fill(pygame.Color("black")) #Black background
+    UpdateDisplay()
+    return
+# End of function. 
+
+# Show the instructions on screen.
+def SetInstructions():
+    global background
+    global smallfont
+    Text = "Tap left and right to change effect."
+    Text = smallfont.render(Text, 1, red)
+    textpos = Text.get_rect()
+    textpos.centerx = background.get_rect().centerx
+    height = Text.get_height()
+    background.blit(Text,(textpos)) #Write the small text
+    Text = "Tap OK to take photos."
+    Text = smallfont.render(Text, 1, red)
+    textpos = Text.get_rect()
+    textpos.centerx = background.get_rect().centerx
+    textpos.centery = height*2
+    background.blit(Text, (textpos))  # Write the small text
+    return
+
+# Writes the current effect to the screen using PyGame. 
+def SetEffectText(NewEffect):
+    global globalEffectDict
+    global background
+    global smallfont
+    #Text = "Effect: " + globalEffectDict[NewEffect]
+    Text = "Effect: " + globalEffectDict[NewEffect]
+    Text = smallfont.render(Text, 1, red)
+    textpos = Text.get_rect()
+    textpos.centerx = background.get_rect().centerx
+    textpos.centery = SCREEN_HEIGHT - Text.get_height()
+    background.blit(Text,(textpos)) #Write the small text
+    #UpdateDisplay()
+    return
+
+def QuitGracefully():
+    camera.stop_preview()
+    camera.close()
+    pygame.quit()
+    quit()
+    #GPIO.remove_event_detect(BUTTON_NEXT)
+    #GPIO.remove_event_detect(BUTTON_BACK)
+    #GPIO.remove_event_detect(BUTTON_START)
+    #GPIO.cleanup()
+    #quit("Quitting program gracefully.")
 # End of function
 
 # Call on an input event that resets Konami Code.
 def KonamiCodeReset():
-    global KonamiLast
+    global globalKonamiLast
     print('Konami Code Reset!')
-    KonamiLast = 'None'
+    globalKonamiLast = 'None'
     return
 
 # If the Konami Code is verified, then fire!
 def KonamiCodeVerified():
     print('Konami Code Verified!!!')
-    pygame.quit()
-    quit()
+    QuitGracefully()
     return
 
 # Call on an input event that is part of Konami Code.
 def KonamiCode(KonamiInput):
-    global KonamiLast
+    global globalKonamiLast
     # Up 1, Up 2, Down 1, Down 2, Left 1, Right 1, Left 2, Right 2, B, A.
-    if KonamiInput == 'Up' and KonamiLast == 'None':
-        KonamiLast = 'Up1'
+    if KonamiInput == 'Up' and globalKonamiLast == 'None':
+        globalKonamiLast = 'Up1'
         Sequence = True
-    elif KonamiInput == 'Up' and KonamiLast == 'Up1':
-        KonamiLast = 'Up2'
+    elif KonamiInput == 'Up' and globalKonamiLast == 'Up1':
+        globalKonamiLast = 'Up2'
         Sequence = True
-    elif KonamiInput == 'Down' and KonamiLast == 'Up2':
-        KonamiLast = 'Down1'
+    elif KonamiInput == 'Down' and globalKonamiLast == 'Up2':
+        globalKonamiLast = 'Down1'
         Sequence = True
-    elif KonamiInput == 'Down' and KonamiLast == 'Down1':
-        KonamiLast = 'Down2'
+    elif KonamiInput == 'Down' and globalKonamiLast == 'Down1':
+        globalKonamiLast = 'Down2'
         Sequence = True
-    elif KonamiInput == 'Left' and KonamiLast == 'Down2':
-        KonamiLast = 'Left1'
+    elif KonamiInput == 'Left' and globalKonamiLast == 'Down2':
+        globalKonamiLast = 'Left1'
         Sequence = True
-    elif KonamiInput == 'Right' and KonamiLast == 'Left1':
-        KonamiLast = 'Right1'
+    elif KonamiInput == 'Right' and globalKonamiLast == 'Left1':
+        globalKonamiLast = 'Right1'
         Sequence = True
-    elif KonamiInput == 'Left' and KonamiLast == 'Right1':
-        KonamiLast = 'Left2'
+    elif KonamiInput == 'Left' and globalKonamiLast == 'Right1':
+        globalKonamiLast = 'Left2'
         Sequence = True
-    elif KonamiInput == 'Right' and KonamiLast == 'Left2':
-        KonamiLast = 'Right2'
+    elif KonamiInput == 'Right' and globalKonamiLast == 'Left2':
+        globalKonamiLast = 'Right2'
         Sequence = True
-    elif KonamiInput == 'B' and KonamiLast == 'Right2':
-        KonamiLast = 'B'
+    elif KonamiInput == 'B' and globalKonamiLast == 'Right2':
+        globalKonamiLast = 'B'
         Sequence = True
-    elif KonamiInput == 'A' and KonamiLast == 'B':
-        KonamiLast = 'A'
+    elif KonamiInput == 'A' and globalKonamiLast == 'B':
+        globalKonamiLast = 'A'
         Sequence = True
-    elif KonamiInput == 'Start' and KonamiLast == 'A':
+    elif KonamiInput == 'Start' and globalKonamiLast == 'A':
         KonamiCodeVerified()
         Sequence = True
     else:
@@ -264,15 +358,6 @@ def LeftMouseButtonDown(xx, yy):
     return
 # End of function.
 
-# Set Camera Annotation Text.
-def SetAnnotate(aText):
-    # camera.annotate_background('Blue')
-    # camera.annotate_foreground('Yellow')
-    camera.annotate_background = picamera.Color('black')
-    camera.annotate_foreground = picamera.Color('white')
-    camera.annotate_text = aText
-# End function.
-
 # Function to change effect.
 def SetEffect(NewEffect):
     global globalEffectList
@@ -280,9 +365,9 @@ def SetEffect(NewEffect):
     global camera
     print('Switching to effect ' + NewEffect)
     camera.image_effect = NewEffect
-    SetAnnotate("Effect: %s" % globalEffectDict[NewEffect])
-    # sleep(10)
-    # SetAnnotate("")
+    SetEffectText(NewEffect)
+    globalEffectCurr = globalEffectList.index(NewEffect)
+    return
 # End of function.
 
 # Function to cycle effects forward.
@@ -315,16 +400,6 @@ def PrevEffect():
     return True
 # End of Function
 
-def QuitGracefully():
-    camera.stop_preview()
-    camera.close()
-    #GPIO.remove_event_detect(BUTTON_NEXT)
-    #GPIO.remove_event_detect(BUTTON_BACK)
-    #GPIO.remove_event_detect(BUTTON_START)
-    #GPIO.cleanup()
-    #quit("Quitting program gracefully.")
-# End of function
-
 # Generates a PhotoBoot Session
 def SetupPhotoboothSession():
     global SessionID
@@ -340,19 +415,29 @@ def TakePhoto(PhotoNum):
     global SessionID
     global globalSessionDir
     PhotoPath = globalSessionDir + '/' + str(PhotoNum) + '.jpg'
-    SetAnnotate('')
     camera.capture(PhotoPath)
 # End of function.
 
 def RunCountdown():
-    SetAnnotate('3')
-    sleep(1)
-    SetAnnotate('2')
-    sleep(1)
-    SetAnnotate('1')
-    sleep(1)
-    SetAnnotate('CHEESE!!!')
-    sleep(1)
+    i = 5
+    while i >= 0:
+        if i == 0:
+            string = 'CHEESE!!!'
+        else:
+            string = str(i)
+        text = bigfont.render(string, 1, red)
+        textpos = text.get_rect()
+        textpos.centerx = background.get_rect().centerx
+        textpos.centery = background.get_rect().centery
+        SetBlankScreen()
+        background.blit(text, textpos)
+        UpdateDisplay()
+        i = i - 1
+        sleep(1)
+    # Blank Cheese off the screen.
+    SetBlankScreen()
+    UpdateDisplay()
+    return
 # End of function.
 
 def ResetPhotoboothSession():
@@ -375,8 +460,9 @@ def RunPhotoboothSession():
 # Function called when the Start zone is tapped.
 def TapStart():
     print("Start")
-    screen.fill(black)
-    pygame.display.flip() # I think this will clear the screen?
+    # I think this will clear the screen?
+    background.fill(black)
+    UpdateDisplay()
     RunPhotoboothSession()
     #sleep(10)
     return
@@ -384,17 +470,34 @@ def TapStart():
 
 # Function called when the Previous zone is tapped.
 def TapPrev():
+    global ShowInstructions
+    global LastTap
     print("Previous")
+    ShowInstructions = False
+    LastTap = time.time()
     PrevEffect()
     return
 # End of Function
 
 # Function called when the Next zone is tapped.
 def TapNext():
+    global ShowInstructions
+    global LastTap
     print("Next")
+    ShowInstructions = False
+    LastTap = time.time()
     NextEffect()
     return
 # End of Function
+
+def IdleReset():
+    global ShowInstructions
+    global LastTap
+    LastTap = 0
+    ShowInstructions = True
+    SetEffect('none')
+    UpdateDisplay()
+# End of function.
 
 ########## End of functions.
 
@@ -404,6 +507,8 @@ def TapNext():
 SetEffect('none')
 camera.start_preview(alpha=PREVIEW_ALPHA)
 sleep(2) # This seems to be recommended when starting the camera.
+
+running = 1
 
 while running:
     event = pygame.event.poll()
@@ -416,11 +521,14 @@ while running:
     elif event.type == pygame.KEYDOWN:
         if event.key == pygame.K_F4:
             print('F4 pressed, quitting.')
-            quit()
+            QuitGracefully()
     #elif event.type == pygame.MOUSEBUTTONUP and event.button == LEFTMOUSEBUTTON:
     #   print("You released the left mouse button at (%d, %d)" % event.pos)
 
-    if KonamiLast == 'A' or KonamiLast == 'B' or KonamiLast == 'Right2':
+    if LastTap != 0 and time.time()-LastTap > IDLETIME:
+        IdleReset()
+
+    if globalKonamiLast == 'A' or globalKonamiLast == 'B' or globalKonamiLast == 'Right2':
         ShowTapZones(True)
     else:
         ShowTapZones(False)
