@@ -117,9 +117,9 @@ rgbPINK = (255,200,200)
 # Background Color!
 rgbBACKGROUND = rgbBLACK
 
-### Initialise PyGame
-#pygame.mixer.pre_init(44100, -16, 1, 1024*3) #PreInit Music, plays faster
-pygame.init() #Initialise pygame
+# Initialise PyGame
+# pygame.mixer.pre_init(44100, -16, 1, 1024*3) #PreInit Music, plays faster
+pygame.init() # Initialise pygame
 # Don't full screen until you have a way to quit the program. ;)
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT),pygame.FULLSCREEN)
 pygame.display.set_caption('Photo Booth')
@@ -129,8 +129,8 @@ background = pygame.Surface(screen.get_size())
 background = background.convert()
 background.fill(rgbBACKGROUND)
 
-#screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-#pygame.mouse.set_visible(False)
+# screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+# pygame.mouse.set_visible(False)
 # Working around what seems to be a bug in PyGame and/or libsdl where the
 # cursor gets stuck in the lower right corner of the Raspberry Pi touchscreen
 # after a few taps. This only happens when the cursor is not visible in PyGame Fullscreen.
@@ -160,7 +160,7 @@ smallfont = pygame.font.Font(None, 50) #Small font for on screen messages.
 bigfont = pygame.font.Font(None, 220) # Big font for countdown.
 
 # Setup Camera resolution for picture taking.
-#PiCam Max Res is 2592, 1944, a nice 4:3 aspect ratio.
+# PiCam Max Res is 2592, 1944, a nice 4:3 aspect ratio.
 # This gives us ready to use thumbnails to montage, no scaling needed.
 CAMRES_W = int((2592/2)-(MONTAGESPACING_W*4))
 # Maintain the Aspect Ratio Math:
@@ -226,7 +226,7 @@ def ShowTapZones(KonamiScreen):
     pygame.draw.rect(background, rgbBLUE, pygame.Rect(NEXT_X, 0, ZONEWIDTH, SCREEN_HEIGHT))
     # Draw the Start tap zone on screen.
     pygame.draw.rect(background, rgbBLUE, pygame.Rect(START_MIN_X, START_MIN_Y, ZONEWIDTH, ZONEWIDTH))
-    #pygame.draw.circle(screen, (0, 128, 255), (400, 240), 75)
+    # pygame.draw.circle(screen, (0, 128, 255), (400, 240), 75)
 
     # If Up,Up,Down,Down,Left,Right,Left,Right has been successfully entered,
     # the tap zone icons change to B, A, and an alien guy.
@@ -547,11 +547,12 @@ def IdleReset():
 # End of function.
 
 # Creates the Montage image using ImageMagick.
-# Python ImageMagick bindings seem to suck, so using the CLI utilites.
+# Python ImageMagick bindings seem to suck, so using the CLI utility.
 def CreateMontage():
     global globalSessionDir
+    global SessionID
     binMontage = '/usr/bin/montage'
-    outFile = globalSessionDir + "/Montage.jpg"
+    outFile = globalSessionDir + "/" + str(SessionID) + ".jpg"
     argsMontage = "-tile 2x4 " + str(globalSessionDir) + "/[1-8].jpg -geometry +" + str(MONTAGESPACING_W) + "+" + str(MONTAGESPACING_H) + " " + outFile
     print(binMontage + " " + argsMontage)
     # Display Processing On screen.
