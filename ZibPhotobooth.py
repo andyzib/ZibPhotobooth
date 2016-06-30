@@ -8,6 +8,8 @@ import picamera
 import pygame
 import time
 import os
+import shutil
+import subprocess
 
 from time import sleep
 
@@ -18,8 +20,11 @@ from time import sleep
 IDLETIME = 30
 
 # Preview Alpha, 0-255
-PREVIEW_ALPHA = 120
-#PREVIEW_ALPHA = 200
+PREVIEW_ALPHA = 120 # OK For Black Background
+#PREVIEW_ALPHA = 140
+#PREVIEW_ALPHA = 200 # Meh for White Background
+#PREVIEW_ALPHA = 220
+#PREVIEW_ALPHA = 240
 
 # Set Screen Dimensions
 SCREEN_WIDTH = 800
@@ -38,7 +43,13 @@ globalWorkDir = '/home/aszbikowski/PhotoBooth_WorkDir'
 globalSessionDir = ''
 
 # Width of previous and next tap zones.
-ZONEWIDTH = 100
+# ZONEWIDTH = 100
+ZONEWIDTH = 80
+
+# Setup the Montage
+# Pixels seperating photos, maintain 4:3 aspect ratio.
+MONTAGESPACING_W = 20
+MONTAGESPACING_H = 15
 
 ########## End of Configuration Section.
 
@@ -95,13 +106,16 @@ DOWN_MAX_Y = SCREEN_HEIGHT
 globalKonamiLast = 'None'
 
 # RGB Codes
-red = (255,0,0)
-green = (0,255,0)
-blue = (0,0,255)
-darkBlue = (0,0,128)
-white = (255,255,255)
-black = (0,0,0)
-pink = (255,200,200)
+rgbRED = (255,0,0)
+rgbGREEN = (0,255,0)
+rgbBLUE = (0,0,255)
+rgbDARKBLUE = (0,0,128)
+rgbWHITE = (255,255,255)
+rgbBLACK = (0,0,0)
+rgbPINK = (255,200,200)
+
+# Background Color!
+rgbBACKGROUND = rgbBLACK
 
 ### Initialise PyGame
 #pygame.mixer.pre_init(44100, -16, 1, 1024*3) #PreInit Music, plays faster
@@ -113,7 +127,7 @@ pygame.display.set_caption('Photo Booth')
 # Setup the game surface
 background = pygame.Surface(screen.get_size())
 background = background.convert()
-background.fill(black)
+background.fill(rgbBACKGROUND)
 
 #screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
 #pygame.mouse.set_visible(False)
@@ -141,16 +155,31 @@ ImgB = pygame.image.load('B.png')
 ImgB = pygame.transform.scale(ImgB, (ZONEWIDTH, ZONEWIDTH))
 
 # Fonts to be used.
-smallfont = pygame.font.Font(None, 50) #S mall font for on screen messages.
+smallfont = pygame.font.Font(None, 50) #Small font for on screen messages.
 # Original: 180
 bigfont = pygame.font.Font(None, 220) # Big font for countdown.
 
+# Setup Camera resolution for picture taking.
+#PiCam Max Res is 2592, 1944, a nice 4:3 aspect ratio.
+# This gives us ready to use thumbnails to montage, no scaling needed.
+CAMRES_W = int((2592/2)-(MONTAGESPACING_W*4))
+# Maintain the Aspect Ratio Math:
+# (original height / original width) x new width = new height
+CAMRES_H = int((1944/2592)*CAMRES_W)
+
+RES_PREVIEW = (640, 480)
+RES_PHOTO = (CAMRES_W, CAMRES_H)
+
+
+
 ########## End of Settings/Globals.
 
-########## Object Initilizations.
+########## Object Initializations.
 camera = picamera.PiCamera()
 camera.rotation = CAMROTATION
 camera.framerate = CAMFREAMERATE
+# Flip the camera horizontally so it acts like a mirror.
+camera.hflip = True
 
 # List of effects to cycle through.
 globalEffectList = ['none','sketch','posterise','emboss','negative','colorswap',
@@ -190,13 +219,13 @@ def UpdateDisplay():
 def ShowTapZones(KonamiScreen):
     global screen
     global background
-    background.fill(pygame.Color("black"))  # Black background
+    background.fill(rgbBACKGROUND)  # Black background
     # Draw the Previous tap zone on screen.
-    pygame.draw.rect(background, blue, pygame.Rect(PREV_X, PREV_Y, ZONEWIDTH, SCREEN_HEIGHT))
+    pygame.draw.rect(background, rgbBLUE, pygame.Rect(PREV_X, PREV_Y, ZONEWIDTH, SCREEN_HEIGHT))
     # Draw the Next tap zone on screen.
-    pygame.draw.rect(background, blue, pygame.Rect(NEXT_X, 0, ZONEWIDTH, SCREEN_HEIGHT))
+    pygame.draw.rect(background, rgbBLUE, pygame.Rect(NEXT_X, 0, ZONEWIDTH, SCREEN_HEIGHT))
     # Draw the Start tap zone on screen.
-    pygame.draw.rect(background, blue, pygame.Rect(START_MIN_X, START_MIN_Y, ZONEWIDTH, ZONEWIDTH))
+    pygame.draw.rect(background, rgbBLUE, pygame.Rect(START_MIN_X, START_MIN_Y, ZONEWIDTH, ZONEWIDTH))
     #pygame.draw.circle(screen, (0, 128, 255), (400, 240), 75)
 
     # If Up,Up,Down,Down,Left,Right,Left,Right has been successfully entered,
@@ -218,7 +247,7 @@ def ShowTapZones(KonamiScreen):
 # End of function
 
 def SetBlankScreen():
-    background.fill(pygame.Color("black")) #Black background
+    background.fill(rgbBACKGROUND)
     UpdateDisplay()
     return
 # End of function. 
@@ -228,13 +257,13 @@ def SetInstructions():
     global background
     global smallfont
     Text = "Tap left and right to change effect."
-    Text = smallfont.render(Text, 1, red)
+    Text = smallfont.render(Text, 1, rgbRED)
     textpos = Text.get_rect()
     textpos.centerx = background.get_rect().centerx
     height = Text.get_height()
     background.blit(Text,(textpos)) #Write the small text
     Text = "Tap OK to take photos."
-    Text = smallfont.render(Text, 1, red)
+    Text = smallfont.render(Text, 1, rgbRED)
     textpos = Text.get_rect()
     textpos.centerx = background.get_rect().centerx
     textpos.centery = height*2
@@ -248,7 +277,7 @@ def SetEffectText(NewEffect):
     global smallfont
     #Text = "Effect: " + globalEffectDict[NewEffect]
     Text = "Effect: " + globalEffectDict[NewEffect]
-    Text = smallfont.render(Text, 1, red)
+    Text = smallfont.render(Text, 1, rgbRED)
     textpos = Text.get_rect()
     textpos.centerx = background.get_rect().centerx
     textpos.centery = SCREEN_HEIGHT - Text.get_height()
@@ -405,7 +434,7 @@ def SetupPhotoboothSession():
     global SessionID
     global globalWorkDir
     global globalSessionDir
-    SessionID = time.time()  # Use UNIX epoc time as session ID.
+    SessionID = int(time.time())  # Use UNIX epoc time as session ID.
     # Create the Session Directory for storing photos.
     globalSessionDir = globalWorkDir + '/' + str(SessionID)
     os.makedirs(globalSessionDir, exist_ok=True)
@@ -415,7 +444,21 @@ def TakePhoto(PhotoNum):
     global SessionID
     global globalSessionDir
     PhotoPath = globalSessionDir + '/' + str(PhotoNum) + '.jpg'
+    camera.stop_preview()
+    camera.resolution = RES_PHOTO
+    camera.hflip = False
+    # Feeling ambitions? PyGame the screen to white, turn off camera preview, take picture, change back to normal.
+    background.fill(rgbWHITE)
+    UpdateDisplay()
     camera.capture(PhotoPath)
+    camera.hflip = True
+    camera.resolution = RES_PREVIEW
+    background.fill(rgbBACKGROUND)
+    UpdateDisplay()
+    camera.start_preview(alpha=PREVIEW_ALPHA)
+    # Create a copy for the ImageMagick Montage Hack.
+    CopyPath = globalSessionDir + '/' + str(PhotoNum+1) + '.jpg'
+    shutil.copy(PhotoPath, CopyPath)
 # End of function.
 
 def RunCountdown():
@@ -425,7 +468,7 @@ def RunCountdown():
             string = 'CHEESE!!!'
         else:
             string = str(i)
-        text = bigfont.render(string, 1, red)
+        text = bigfont.render(string, 1, rgbRED)
         textpos = text.get_rect()
         textpos.centerx = background.get_rect().centerx
         textpos.centery = background.get_rect().centery
@@ -448,12 +491,16 @@ def ResetPhotoboothSession():
 
 def RunPhotoboothSession():
     global NUMPHOTOS
-    currentPhoto = 1
+    currentPhoto = 1 # File name for photo. ImageMagick Montage Hack.
+    PhotoCounter = 1 # Number of photos taken.
     SetupPhotoboothSession()
-    while currentPhoto <= NUMPHOTOS:
+    while PhotoCounter <= NUMPHOTOS:
         RunCountdown()
         TakePhoto(currentPhoto)
-        currentPhoto = currentPhoto + 1
+        currentPhoto = currentPhoto + 2 # ImageMagick Montage Hack, 1,3,5,7...
+        PhotoCounter = PhotoCounter + 1
+    montageFile = CreateMontage()
+    print("Montage File: " + montageFile)
     ResetPhotoboothSession()
 # End of function.
 
@@ -461,7 +508,7 @@ def RunPhotoboothSession():
 def TapStart():
     print("Start")
     # I think this will clear the screen?
-    background.fill(black)
+    background.fill(rgbBACKGROUND)
     UpdateDisplay()
     RunPhotoboothSession()
     #sleep(10)
@@ -499,12 +546,34 @@ def IdleReset():
     UpdateDisplay()
 # End of function.
 
+# Creates the Montage image using ImageMagick.
+# Python ImageMagick bindings seem to suck, so using the CLI utilites.
+def CreateMontage():
+    global globalSessionDir
+    binMontage = '/usr/bin/montage'
+    outFile = globalSessionDir + "/Montage.jpg"
+    argsMontage = "-tile 2x4 " + str(globalSessionDir) + "/[1-8].jpg -geometry +" + str(MONTAGESPACING_W) + "+" + str(MONTAGESPACING_H) + " " + outFile
+    print(binMontage + " " + argsMontage)
+    # Display Processing On screen.
+    string = "Processing, Please Wait."
+    text = smallfont.render(string, 1, rgbRED)
+    textpos = text.get_rect()
+    textpos.centerx = background.get_rect().centerx
+    textpos.centery = background.get_rect().centery
+    SetBlankScreen()
+    background.blit(text, textpos)
+    UpdateDisplay()
+    subprocess.call(binMontage + " " + argsMontage, shell=True)
+    return outFile
+# End of function.
+
 ########## End of functions.
 
 
 ######### Main
 
 SetEffect('none')
+camera.resolution = RES_PREVIEW
 camera.start_preview(alpha=PREVIEW_ALPHA)
 sleep(2) # This seems to be recommended when starting the camera.
 

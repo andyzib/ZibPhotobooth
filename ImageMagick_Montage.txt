@@ -1,0 +1,44 @@
+montage
+
+-geometry
+The "-geometry" setting, is the most important control of "montage". It defines the size of the individual thumbnail images, and the spacing between them. 
+
+montage -tile 2x4 [1-8].jpg -geometry +10+10 test2.jpg
+
+montage -tile COLUMNSxROWS imagelist -geometry WxH+BORDER+BORDER outputFile.jpg
+
+This command will tile things. We want to resize the images, then combine. 
+Also, need to update code to number images 1,3,5,7 instead of 1,2,3,4. 
+Then:
+cp 1.jpg 2.jpg
+cp 3.jpg 4.jpg
+cp 5.jpg 6.jpg
+cp 7.jpg 8.jpg
+
+That will create the deseried grid:
+1   2   - Same Image
+3   4   - Same Image
+5   6   - Same Image
+7   8   - Same Image
+
+montage -tile 2x4 [1-8].jpg -geometry 800x480+10+10 test4.jpg
+
+Target Photo Sizes.
+4x6 - Photo Paper Size. (Canon Slpy)
+3.5x5 
+4x5
+4x6
+5x7
+
+
+montage -tile 2x4 [1-8].jpg -geometry +10+10 test2.jpg
+montage -tile 2x4 [1-8].jpg -geometry 480x800+10+10 test3.jpg
+montage -tile 2x4 [1-8].jpg -geometry 800x480+10+10 test4.jpg
+montage -tile 2x4 [1-8].jpg -geometry 800x480+10+10 -border 10 border.jpg
+montage -tile 2x4 [1-8].jpg -geometry 800x480+10+10 -shadow border.jpg
+montage -tile 2x4 [1-8].jpg -geometry 800x480+10+10 -frame 10 border.jpg
+montage -tile 2x4 [1-8].jpg -geometry 800x480+10+10 -border 10 border.jpg
+montage -tile 2x4 [1-8].jpg -geometry 800x480+10+10 -frame 10 frame.jpg
+montage -tile 2x4 [1-8].jpg -geometry 800x480+10+10 -shadow shadow.jpg
+montage -tile 2x4 [1-8].jpg -geometry 800x480+10+10 +polaroid polaroid.jpg
+montage -tile 2x4 [1-8].jpg -geometry 800x480+10+10 -gravity center +polaroid polaroid2.jpg
