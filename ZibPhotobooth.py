@@ -10,7 +10,7 @@ import time
 import os
 import shutil
 import subprocess
-
+from PIL import Image
 from time import sleep
 
 
@@ -440,6 +440,12 @@ def SetupPhotoboothSession():
     os.makedirs(globalSessionDir, exist_ok=True)
 # End of function
 
+def StartCameraPreview():
+    camera.hflip = True
+    camera.resolution = RES_PREVIEW
+    camera.start_preview(alpha=PREVIEW_ALPHA)
+# End of function.
+
 def TakePhoto(PhotoNum):
     global SessionID
     global globalSessionDir
@@ -451,14 +457,9 @@ def TakePhoto(PhotoNum):
     background.fill(rgbWHITE)
     UpdateDisplay()
     camera.capture(PhotoPath)
-    camera.hflip = True
-    camera.resolution = RES_PREVIEW
     background.fill(rgbBACKGROUND)
     UpdateDisplay()
-    camera.start_preview(alpha=PREVIEW_ALPHA)
-    # Create a copy for the ImageMagick Montage Hack.
-    CopyPath = globalSessionDir + '/' + str(PhotoNum+1) + '.jpg'
-    shutil.copy(PhotoPath, CopyPath)
+    StartCameraPreview()
 # End of function.
 
 def RunCountdown():
@@ -486,21 +487,21 @@ def RunCountdown():
 def ResetPhotoboothSession():
     global SessionID
     SessionID = 0
+    StartCameraPreview()
     SetEffect('none')
 # End of function.
 
 def RunPhotoboothSession():
     global NUMPHOTOS
-    currentPhoto = 1 # File name for photo. ImageMagick Montage Hack.
-    PhotoCounter = 1 # Number of photos taken.
+    currentPhoto = 1 # File name for photo.
     SetupPhotoboothSession()
-    while PhotoCounter <= NUMPHOTOS:
+    while currentPhoto <= NUMPHOTOS:
         RunCountdown()
         TakePhoto(currentPhoto)
-        currentPhoto = currentPhoto + 2 # ImageMagick Montage Hack, 1,3,5,7...
-        PhotoCounter = PhotoCounter + 1
+        currentPhoto = currentPhoto + 1
     montageFile = CreateMontage()
     print("Montage File: " + montageFile)
+    PreviewMontage(montageFile)
     ResetPhotoboothSession()
 # End of function.
 
@@ -551,9 +552,22 @@ def IdleReset():
 def CreateMontage():
     global globalSessionDir
     global SessionID
+    global globalWorkDir
     binMontage = '/usr/bin/montage'
     outFile = globalSessionDir + "/" + str(SessionID) + ".jpg"
-    argsMontage = "-tile 2x4 " + str(globalSessionDir) + "/[1-8].jpg -geometry +" + str(MONTAGESPACING_W) + "+" + str(MONTAGESPACING_H) + " " + outFile
+    argsMontage = "-tile 2x6 "
+    # Loop controls.
+    incrementCounter = False
+    photoCounter = 1
+    for counter in range(1, NUMPHOTOS*2+1):
+        argsMontage = argsMontage + str(globalSessionDir) + "/" + str(photoCounter) + ".jpg "
+        if incrementCounter:
+            photoCounter = photoCounter + 1
+            incrementCounter = False
+        else:
+            incrementCounter = True
+    argsMontage = argsMontage + globalWorkDir + "/Logo.png " + globalWorkDir + "/Logo.png "
+    argsMontage = argsMontage + "-geometry +" + str(MONTAGESPACING_W) + "+" + str(MONTAGESPACING_H) + " " + outFile
     print(binMontage + " " + argsMontage)
     # Display Processing On screen.
     string = "Processing, Please Wait."
@@ -568,6 +582,26 @@ def CreateMontage():
     return outFile
 # End of function.
 
+# Show preview of the montage.
+def PreviewMontage(MontageFile):
+    print("Show something.")
+    preview = pygame.image.load(MontageFile)
+    PILpreview = Image.open(MontageFile)
+    previewSize = PILpreview.size # returns (width, height) tuple
+    ScaleW = AspectRatioCalc(previewSize[0], previewSize[1], SCREEN_HEIGHT)
+    preview = pygame.transform.scale(preview, (ScaleW, SCREEN_HEIGHT))
+    SetBlankScreen()
+    background.blit(preview, (SCREEN_WIDTH/2-ScaleW/2, 0))
+    camera.stop_preview()
+    UpdateDisplay()
+    sleep(15)
+    return
+# End of function.
+
+# Aspect Ratio Calculator
+def AspectRatioCalc(OldW, OldH, NewH):
+    return int((OldW/OldH)*NewH)
+# End of function.
 ########## End of functions.
 
 
