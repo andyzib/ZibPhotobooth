@@ -8,6 +8,7 @@ A Raspberry Pi Photo Booth program.
 * Combining Photos into a composite photo strip. 
 * Adding custom text/logo/event name to photo strip. (Create Logo.png in an image editor.)
 * Display preveiw of photo strip. 
+* Demo mode that cycles through the photo effects when nobody is interacting with the photo booth. 
 
 ## Not Completed
 * Printing with CUPS. 

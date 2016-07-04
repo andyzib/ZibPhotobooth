@@ -19,6 +19,10 @@ from time import sleep
 # Idle Time, in seconds
 IDLETIME = 30
 
+# Number of seconds between effect changes when the demo is running.
+# 10 seconds is pretty good, will cycle through the 12 effects every 2 minutes.
+DEMOCYCLETIME = 10
+
 # Preview Alpha, 0-255
 PREVIEW_ALPHA = 120 # OK For Black Background
 #PREVIEW_ALPHA = 140
@@ -191,6 +195,10 @@ SessionID = 0
 # Show instructions on screen?
 ShowInstructions = True
 LastTap = 0
+
+# Run the Demo
+RunDemo = True
+RunDemoCounter = 0
 
  ########## Functions
 
@@ -482,6 +490,15 @@ def ResetPhotoboothSession():
     SetEffect('none')
 # End of function.
 
+def CopyMontageDCIM(montageFile):
+    global globalDCIMDir
+    # Use copy not copyfile to copy a file to a directory.
+    if os.path.isdir(globalDCIMDir):
+        return shutil.copy(montageFile,globalDCIMDir)
+    else:
+        return False
+# End of function.
+
 def RunPhotoboothSession():
     global NUMPHOTOS
     currentPhoto = 1 # File name for photo.
@@ -491,6 +508,7 @@ def RunPhotoboothSession():
         TakePhoto(currentPhoto)
         currentPhoto = currentPhoto + 1
     montageFile = CreateMontage()
+    CopyMontageDCIM(montageFile)
     print("Montage File: " + montageFile)
     PreviewMontage(montageFile)
     ResetPhotoboothSession()
@@ -498,7 +516,9 @@ def RunPhotoboothSession():
 
 # Function called when the Start zone is tapped.
 def TapStart():
+    global RunDemo
     print("Start")
+    RunDemo = False
     # I think this will clear the screen?
     background.fill(rgbBACKGROUND)
     UpdateDisplay()
@@ -509,6 +529,8 @@ def TapStart():
 
 # Function called when the Previous zone is tapped.
 def TapPrev():
+    global RunDemo
+    RunDemo = False
     global ShowInstructions
     global LastTap
     print("Previous")
@@ -522,6 +544,8 @@ def TapPrev():
 def TapNext():
     global ShowInstructions
     global LastTap
+    global RunDemo
+    RunDemo = False
     print("Next")
     ShowInstructions = False
     LastTap = time.time()
@@ -532,8 +556,11 @@ def TapNext():
 def IdleReset():
     global ShowInstructions
     global LastTap
+    global RunDemo
     LastTap = 0
     ShowInstructions = True
+    RunDemo = True
+    RunDemoCounter = 0
     SetEffect('none')
     UpdateDisplay()
 # End of function.
@@ -597,6 +624,13 @@ def AspectRatioCalc(OldH, OldW, NewW):
 # End of function.
 ########## End of functions.
 
+def DemoFlip():
+    global RunDemo
+    global RunDemoCounter
+    if (time.time()-RunDemoCounter >= DEMOCYCLETIME):
+        NextEffect()
+        RunDemoCounter = time.time()
+# End of function.
 
 ######### Main
 
@@ -618,6 +652,7 @@ camera.start_preview(alpha=PREVIEW_ALPHA)
 sleep(2) # This seems to be recommended when starting the camera.
 
 running = 1
+RunDemoCounter = time.time()
 
 while running:
     event = pygame.event.poll()
@@ -633,6 +668,9 @@ while running:
             QuitGracefully()
     #elif event.type == pygame.MOUSEBUTTONUP and event.button == LEFTMOUSEBUTTON:
     #   print("You released the left mouse button at (%d, %d)" % event.pos)
+    elif RunDemo:
+        DemoFlip()
+
 
     if LastTap != 0 and time.time()-LastTap > IDLETIME:
         IdleReset()
