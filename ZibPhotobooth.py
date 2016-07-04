@@ -39,6 +39,7 @@ CAMFREAMERATE = 15
 
 # Working Directory
 globalWorkDir = '/home/aszbikowski/PhotoBooth_WorkDir'
+globalDCIMDir = globalWorkDir + '/DCIM'
 # Session Directory
 globalSessionDir = ''
 
@@ -47,9 +48,12 @@ globalSessionDir = ''
 ZONEWIDTH = 80
 
 # Setup the Montage
-# Pixels seperating photos, maintain 4:3 aspect ratio.
-MONTAGESPACING_W = 20
-MONTAGESPACING_H = 15
+# Pixels separating photos, maintain 2:3 aspect ratio. (Perfect for a 4"x6" print)
+MONTAGESPACING_W = 30
+MONTAGESPACING_H = 20
+MONTAGE_W = 1920
+MONTAGE_H = 2880
+
 
 ########## End of Configuration Section.
 
@@ -158,19 +162,6 @@ ImgB = pygame.transform.scale(ImgB, (ZONEWIDTH, ZONEWIDTH))
 smallfont = pygame.font.Font(None, 50) #Small font for on screen messages.
 # Original: 180
 bigfont = pygame.font.Font(None, 220) # Big font for countdown.
-
-# Setup Camera resolution for picture taking.
-# PiCam Max Res is 2592, 1944, a nice 4:3 aspect ratio.
-# This gives us ready to use thumbnails to montage, no scaling needed.
-CAMRES_W = int((2592/2)-(MONTAGESPACING_W*4))
-# Maintain the Aspect Ratio Math:
-# (original height / original width) x new width = new height
-CAMRES_H = int((1944/2592)*CAMRES_W)
-
-RES_PREVIEW = (640, 480)
-RES_PHOTO = (CAMRES_W, CAMRES_H)
-
-
 
 ########## End of Settings/Globals.
 
@@ -567,7 +558,8 @@ def CreateMontage():
         else:
             incrementCounter = True
     argsMontage = argsMontage + globalWorkDir + "/Logo.png " + globalWorkDir + "/Logo.png "
-    argsMontage = argsMontage + "-geometry +" + str(MONTAGESPACING_W) + "+" + str(MONTAGESPACING_H) + " " + outFile
+    #argsMontage = argsMontage + "-geometry " + str(MONTAGE_W) + "x" + str(MONTAGE_H) + "+" + str(MONTAGESPACING_W) + "+" + str(MONTAGESPACING_H) + " " + outFile
+    argsMontage = argsMontage + "-geometry " + "+" + str(MONTAGESPACING_W) + "+" + str(MONTAGESPACING_H) + " " + outFile
     print(binMontage + " " + argsMontage)
     # Display Processing On screen.
     string = "Processing, Please Wait."
@@ -599,13 +591,26 @@ def PreviewMontage(MontageFile):
 # End of function.
 
 # Aspect Ratio Calculator
-def AspectRatioCalc(OldW, OldH, NewH):
-    return int((OldW/OldH)*NewH)
+def AspectRatioCalc(OldH, OldW, NewW):
+    #(original height / original width) x new width = new height
+    return int((OldH/OldW)*NewW)
 # End of function.
 ########## End of functions.
 
 
 ######### Main
+
+# Setup Camera resolution for picture taking.
+# PiCam Max Res is 2592, 1944, a 4:3 aspect ratio.
+# A 4x6 print (4 inch height, 6 inch width) is 3:2 aspect ratio.
+# This gives us ready to use thumbnails to montage, minimal scaling needed.
+CAMRES_W = int((MONTAGE_W/2)-(MONTAGESPACING_W*2))
+# Maintain the Aspect Ratio Math:
+# (original height / original width) x new width = new height
+CAMRES_H = AspectRatioCalc(1920, 2880, CAMRES_W)
+RES_PREVIEW = (640, 480)
+RES_PHOTO = (CAMRES_W, CAMRES_H)
+
 
 SetEffect('none')
 camera.resolution = RES_PREVIEW
