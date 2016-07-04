@@ -13,3 +13,6 @@ A Raspberry Pi Photo Booth program.
 * Printing with CUPS. 
 * A debug/operator mode for dealing with paused printers and other exceptions. 
 * Add back GPIO button support in addition to touchscreen. 
+
+## Usage
+* Logo.png should be 920x280 pixels. (920 wide by 280 height)
