@@ -65,7 +65,22 @@ print('Camera:Framerate=' + config.get('Camera','Framerate',fallback='15'))
 print('Camera:hflip=' + config.get('Camera','hflip',fallback='True'))
 
 # event.ini
+print('Event:Logo=' + config.get('Event', 'Logo'))
+print('Effects:sketch' + config.get('Effects','sketch'))
+print('Effects:posterise' + config.get('Effects','posterise'))
+print('Effects:emboss' + config.get('Effects','emboss'))
+print('Effects:negitive' + config.get('Effects','negitive'))
+print('Effects:colorswap' + config.get('Effects','colorswap'))
+print('Effects:hatch' + config.get('Effects','hatch'))
+print('Effects:watercolor' + config.get('Effects','watercolor'))
+print('Effects:cartoon' + config.get('Effects','cartoon'))
+print('Effects:washedout' + config.get('Effects','washedout'))
+print('Effects:solarize' + config.get('Effects','solarize'))
+print('Effects:oilpaint' + config.get('Effects','oilpaint'))
 
 # hardware.ini
+print('Display:Width=' + config.get('Display', 'Width'))
+print('Display:Height=' + config.get('Display', 'Height'))
 
 # printer.ini
+print('Printer:Enabled=' + config.get('Printer', 'Enabled'))
